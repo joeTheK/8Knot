@@ -17,10 +17,10 @@ from pages.utils.job_utils import nodata_graph
 import time
 import datetime as dt
 
-PAGE = "starterHealth"
-VIZ_ID = "contrib-importance-pie"
+PAGE = "funding"
+VIZ_ID = "contr_type"
 
-gc_contrib_importance_pie = dbc.Card(
+gc_contr_type = dbc.Card(
     [
         dbc.CardBody(
             [
