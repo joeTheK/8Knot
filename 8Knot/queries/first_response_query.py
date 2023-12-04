@@ -48,30 +48,17 @@ def first_response_query(self, repos):
         return None
 
     query_string = f"""
-                    SELECT
+                    WITH repo_list AS (
+                    
+                    SELECT repo_id FROM (VALUES ({'), ('.join([str(r) for r in repos])})) AS r (repo_id))
 
-                    FROM
-
-                    WHERE
-                        repo_id in ({str(repos)[1:-1]})
-
-                    SELECT prrt.repo_id, prrt.hours_to_first_response
-
+                    SELECT prrt.repo_id AS id, prrt.hours_to_first_response AS created
+                    
                     FROM augur_data.explorer_pr_response_times prrt
-
+                    
                     INNER JOIN repo_list rl ON rl.repo_id = prrt.repo_id; 
 
                 """
-    
-    # """
-    #                 SELECT prrt.repo_id, prrt.hours_to_first_response
-
-    #                 FROM augur_data.explorer_pr_response_times prrt
-
-    #                 INNER JOIN repo_list rl ON rl.repo_id = prrt.repo_id; 
-
-    #             """
-
     try:
         dbm = AugurManager()
         engine = dbm.get_engine()
@@ -97,8 +84,8 @@ def first_response_query(self, repos):
 
     """
     # change to compatible type and remove all data that has been incorrectly formated
-    df["created"] = pd.to_datetime(df["created"], utc=True).dt.date
-    df = df[df.created < dt.date.today()]
+    # df["created"] = pd.to_datetime(df["created"], utc=True).dt.date
+    # df = df[df.created < dt.date.today()]
 
     pic = []
 

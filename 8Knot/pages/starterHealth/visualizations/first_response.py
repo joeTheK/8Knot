@@ -23,7 +23,7 @@ gc_first_response = dbc.Card(
         dbc.CardBody(
             [
                 html.H3(
-                    "Time to First Response",
+                    "bb Time to First Response",
                     className="card-title",
                     style={"textAlign": "center"},
                 ),
@@ -156,53 +156,24 @@ def unique_domains_graph(repolist, num, start_date, end_date):
 
 def process_data(df: pd.DataFrame, num, start_date, end_date):
     # convert to datetime objects rather than strings
-    df["created"] = pd.to_datetime(df["created"], utc=True)
-
-    # order values chronologically by COLUMN_TO_SORT_BY date
-    df = df.sort_values(by="created", axis=0, ascending=True)
-
-    # filter values based on date picker
-    if start_date is not None:
-        df = df[df.created >= start_date]
-    if end_date is not None:
-        df = df[df.created <= end_date]
-
-    # creates list of unique emails and flattens list result
-    emails = df.email_list.str.split(" , ").explode("email_list").unique().tolist()
-
-    # remove any entries not in email format
-    emails = [x for x in emails if "@" in x]
-
-    # creates list of email domains from the emails list
-    email_domains = [x[x.rindex("@") + 1 :] for x in emails]
-
-    # creates df of domains and counts
-    df = pd.DataFrame(email_domains, columns=["domains"]).value_counts().to_frame().reset_index()
-
-    df = df.rename(columns={0: "occurences"})
-
-    # changes the name of the company if under a certain threshold
-    df.loc[df.occurences <= num, "domains"] = "Other"
-
-    # groups others together for final counts
-    df = (
-        df.groupby(by="domains")["occurences"]
-        .sum()
-        .reset_index()
-        .sort_values(by=["occurences"], ascending=False)
-        .reset_index(drop=True)
-    )
 
     return df
 
 
 def create_figure(df: pd.DataFrame):
     # graph generation
-    fig = px.pie(df, names="domains", values="occurences", color_discrete_sequence=color_seq)
+    fig = px.histogram(df, x="id", y="created")
+    
     fig.update_traces(
-        textposition="inside",
-        textinfo="percent+label",
-        hovertemplate="%{label} <br>Contributions: %{value}<br><extra></extra>",
+        xbins_size="M3",
+        hovertemplate="Date: %{x}" + "<br>Amount: %{y}",
+    )
+
+    fig.update_layout(
+        xaxis_title="Quarter",
+        yaxis_title="Contributions",
+        margin_b=40,
+        font=dict(size=14),
     )
 
     return fig
