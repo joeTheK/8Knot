@@ -8,7 +8,7 @@ import logging
 from dateutil.relativedelta import *  # type: ignore
 import plotly.express as px
 from pages.utils.graph_utils import get_graph_time_values, color_seq
-from queries.contributors_query import contributors_query as ctq
+from queries.company_query import company_query as cmq
 import io
 from cache_manager.cache_manager import CacheManager as cm
 from pages.utils.job_utils import nodata_graph
@@ -16,6 +16,7 @@ import time
 import datetime as dt
 import math
 import numpy as np
+from fuzzywuzzy import fuzz
 
 
 PAGE = "funding"
@@ -34,14 +35,13 @@ gc_org_div = dbc.Card(
                     [
                         dbc.PopoverHeader("Graph Info:"),
                         dbc.PopoverBody(
-                            """This visualization gives a view into the development speed of a repository in\n
-                            relation to the other selected repositories. For more context of this visualization see\n
-                            https://chaoss.community/kb/metric-project-velocity/ \n
-                            https://www.cncf.io/blog/2017/06/05/30-highest-velocity-open-source-projects/ """
+                            """
+                            Organizational diversity expresses how many different organizations are involved in a project and how involved different organizations are compared to one another. The more diversity within a project the more minds and coding styles are present. If you have one programmer from Amazon and one programmer from Exxon Mobile then you have two vastly different coding styles going into one project, for better or for worse.
+                            """
                         ),
                     ],
                     id=f"popover-{PAGE}-{VIZ_ID}",
-                    target=f"popover-target-{PAGE}-{VIZ_ID}",
+                    target=f"popover-target-{PAGE}-{VIZ_ID}",  # needs to be the same as dbc.Button id
                     placement="top",
                     is_open=False,
                 ),
@@ -53,116 +53,44 @@ gc_org_div = dbc.Card(
                         dbc.Row(
                             [
                                 dbc.Label(
-                                    "Issue Opened Weight:",
-                                    html_for=f"issue-opened-weight-{PAGE}-{VIZ_ID}",
-                                    width={"size": "auto"},
-                                ),
-                                dbc.Col(
-                                    dbc.Input(
-                                        id=f"issue-opened-weight-{PAGE}-{VIZ_ID}",
-                                        type="number",
-                                        min=0,
-                                        max=1,
-                                        step=0.1,
-                                        value=0.3,
-                                        size="sm",
-                                    ),
-                                    className="me-2",
-                                    width=1,
-                                ),
-                                dbc.Label(
-                                    "Issue Closed Weight:",
-                                    html_for=f"issue-closed-weight-{PAGE}-{VIZ_ID}",
-                                    width={"size": "auto"},
-                                ),
-                                dbc.Col(
-                                    dbc.Input(
-                                        id=f"issue-closed-weight-{PAGE}-{VIZ_ID}",
-                                        type="number",
-                                        min=0,
-                                        max=1,
-                                        step=0.1,
-                                        value=0.4,
-                                        size="sm",
-                                    ),
-                                    className="me-2",
-                                    width=1,
-                                ),
-                                dbc.Label(
-                                    "Y-axis:",
-                                    html_for=f"graph-view-{PAGE}-{VIZ_ID}",
+                                    "Date Interval:",
+                                    html_for=f"date-radio-{PAGE}-{VIZ_ID}",
                                     width="auto",
                                 ),
                                 dbc.Col(
-                                    dbc.RadioItems(
-                                        id=f"graph-view-{PAGE}-{VIZ_ID}",
-                                        options=[
-                                            {"label": "Non-log", "value": False},
-                                            {"label": "Log", "value": True},
-                                        ],
-                                        value=False,
-                                        inline=True,
-                                    ),
-                                    className="me-2",
+                                    [
+                                        dbc.RadioItems(
+                                            id=f"date-radio-{PAGE}-{VIZ_ID}",
+                                            options=[
+                                                {"label": "Company in Bio", "value": "C"},
+                                                {"label": "Email Domain", "value": "D"},
+                                            ],
+                                            value="C",
+                                            inline=True,
+                                        ),
+                                    ]
                                 ),
-                            ],
-                            align="center",
+                            ]
                         ),
                         dbc.Row(
                             [
                                 dbc.Label(
-                                    "PR Open Weight:",
-                                    html_for=f"pr-open-weight-{PAGE}-{VIZ_ID}",
+                                    "Contributions Required:",
+                                    html_for=f"contributions-required-{PAGE}-{VIZ_ID}",
                                     width={"size": "auto"},
                                 ),
                                 dbc.Col(
                                     dbc.Input(
-                                        id=f"pr-open-weight-{PAGE}-{VIZ_ID}",
+                                        id=f"contributions-required-{PAGE}-{VIZ_ID}",
                                         type="number",
-                                        min=0,
-                                        max=1,
-                                        step=0.1,
-                                        value=0.5,
+                                        min=1,
+                                        max=50,
+                                        step=1,
+                                        value=5,
                                         size="sm",
                                     ),
                                     className="me-2",
-                                    width=1,
-                                ),
-                                dbc.Label(
-                                    "PR Merged Weight:",
-                                    html_for=f"pr-merged-weight-{PAGE}-{VIZ_ID}",
-                                    width={"size": "auto"},
-                                ),
-                                dbc.Col(
-                                    dbc.Input(
-                                        id=f"pr-merged-weight-{PAGE}-{VIZ_ID}",
-                                        type="number",
-                                        min=0,
-                                        max=1,
-                                        step=0.1,
-                                        value=0.7,
-                                        size="sm",
-                                    ),
-                                    className="me-2",
-                                    width=1,
-                                ),
-                                dbc.Label(
-                                    "PR Closed Weight:",
-                                    html_for=f"pr-closed-weight-{PAGE}-{VIZ_ID}",
-                                    width={"size": "auto"},
-                                ),
-                                dbc.Col(
-                                    dbc.Input(
-                                        id=f"pr-closed-weight-{PAGE}-{VIZ_ID}",
-                                        type="number",
-                                        min=0,
-                                        max=1,
-                                        step=0.1,
-                                        value=0.2,
-                                        size="sm",
-                                    ),
-                                    className="me-2",
-                                    width=1,
+                                    width=2,
                                 ),
                             ],
                             align="center",
@@ -213,32 +141,24 @@ def toggle_popover(n, is_open):
     return is_open
 
 
-# callback for Project Velocity graph
+# callback for Company Affiliation by Github Account Info graph
 @callback(
     Output(f"{PAGE}-{VIZ_ID}", "figure"),
     [
         Input("repo-choices", "data"),
-        Input(f"graph-view-{PAGE}-{VIZ_ID}", "value"),
-        Input(f"issue-opened-weight-{PAGE}-{VIZ_ID}", "value"),
-        Input(f"issue-closed-weight-{PAGE}-{VIZ_ID}", "value"),
-        Input(f"pr-open-weight-{PAGE}-{VIZ_ID}", "value"),
-        Input(f"pr-merged-weight-{PAGE}-{VIZ_ID}", "value"),
-        Input(f"pr-closed-weight-{PAGE}-{VIZ_ID}", "value"),
+        Input(f"contributions-required-{PAGE}-{VIZ_ID}", "value"),
         Input(f"date-picker-range-{PAGE}-{VIZ_ID}", "start_date"),
         Input(f"date-picker-range-{PAGE}-{VIZ_ID}", "end_date"),
     ],
     background=True,
 )
-def project_velocity_graph(
-    repolist, log, i_o_weight, i_c_weight, pr_o_weight, pr_m_weight, pr_c_weight, start_date, end_date
-):
-
+def organizatin_diversity_graph(repolist, num, start_date, end_date):
     # wait for data to asynchronously download and become available.
     cache = cm()
-    df = cache.grabm(func=ctq, repos=repolist)
+    df = cache.grabm(func=cmq, repos=repolist)
     while df is None:
         time.sleep(1.0)
-        df = cache.grabm(func=ctq, repos=repolist)
+        df = cache.grabm(func=cmq, repos=repolist)
 
     start = time.perf_counter()
     logging.warning(f"{VIZ_ID}- START")
@@ -248,103 +168,102 @@ def project_velocity_graph(
         logging.warning(f"{VIZ_ID} - NO DATA AVAILABLE")
         return nodata_graph
 
-    # function for all data pre processing
-    df = process_data(df, start_date, end_date, i_o_weight, i_c_weight, pr_o_weight, pr_m_weight, pr_c_weight)
+    # function for all data pre processing, COULD HAVE ADDITIONAL INPUTS AND OUTPUTS
+    df = process_data(df, num, start_date, end_date)
 
-    fig = create_figure(df, log)
+    fig = create_figure(df)
 
     logging.warning(f"{VIZ_ID} - END - {time.perf_counter() - start}")
     return fig
 
 
-def process_data(
-    df: pd.DataFrame,
-    start_date,
-    end_date,
-    i_o_weight,
-    i_c_weight,
-    pr_o_weight,
-    pr_m_weight,
-    pr_c_weight,
-):
+def process_data(df: pd.DataFrame, num, start_date, end_date):
+    """Implement your custom data-processing logic in this function.
+    The output of this function is the data you intend to create a visualization with,
+    requiring no further processing."""
 
     # convert to datetime objects rather than strings
-    df["created_at"] = pd.to_datetime(df["created_at"], utc=True)
+    df["created"] = pd.to_datetime(df["created"], utc=True)
 
     # order values chronologically by COLUMN_TO_SORT_BY date
-    df = df.sort_values(by="created_at", axis=0, ascending=True)
+    df = df.sort_values(by="created", axis=0, ascending=True)
 
     # filter values based on date picker
     if start_date is not None:
-        df = df[df.created_at >= start_date]
+        df = df[df.created >= start_date]
     if end_date is not None:
-        df = df[df.created_at <= end_date]
+        df = df[df.created <= end_date]
 
-    # df to hold value of unique contributors for each repo
-    df_cntrbs = pd.DataFrame(df.groupby("repo_name")["cntrb_id"].nunique()).rename(
-        columns={"cntrb_id": "num_unique_contributors"}
+    # intital count of same company name in github profile
+    result = df.cntrb_company.value_counts(dropna=False)
+
+    # reset format for df work
+    df = result.to_frame()
+    df["company_name"] = df.index
+    df = df.reset_index()
+    df["company_name"] = df["company_name"].astype(str)
+    df = df.rename(columns={"index": "orginal_name", "cntrb_company": "contribution_count"})
+
+    # applies fuzzy matching comparing all rows to each other
+    df["match"] = df.apply(lambda row: fuzzy_match(df, row["company_name"]), axis=1)
+
+    # changes company name to match other fuzzy matches
+    for x in range(0, len(df)):
+        # gets match values for the current row
+        matches = df.iloc[x]["match"]
+        for y in matches:
+            # for each match, change the name to its match and clear out match column as
+            # it will unnecessarily reapply changes
+            df.loc[y, "company_name"] = df.iloc[x]["company_name"]
+            df.loc[y, "match"] = ""
+
+    # groups all same name company affiliation and sums the contributions
+    df = (
+        df.groupby(by="company_name")["contribution_count"]
+        .sum()
+        .reset_index()
+        .sort_values(by=["contribution_count"])
+        .reset_index(drop=True)
     )
 
-    # group actions and repos to get the counts of the actions by repo
-    df_actions = pd.DataFrame(df.groupby("repo_name")["Action"].value_counts())
-    df_actions = df_actions.rename(columns={"Action": "count"}).reset_index()
+    # changes the name of the company if under a certain threshold
+    df.loc[df.contribution_count <= num, "company_name"] = "Other"
 
-    # pivot df to reformat the actions to be columns and repo_id to be rows
-    df_actions = df_actions.pivot(index="repo_name", columns="Action", values="count")
-
-    # df_consolidated combines the actions and unique contributors and then specific columns for visualization use are added on
-    df_consolidated = pd.concat([df_actions, df_cntrbs], axis=1).reset_index()
-
-    # log of commits and contribs
-    df_consolidated["log_num_commits"] = df_consolidated["Commit"].apply(math.log)
-    df_consolidated["log_num_contrib"] = df_consolidated["num_unique_contributors"].apply(math.log)
-
-    # column to hold the weighted values of pr and issues actions summed together
-    df_consolidated["prs_issues_actions_weighted"] = (
-        df_consolidated["Issue Opened"] * i_o_weight
-        + df_consolidated["Issue Closed"] * i_c_weight
-        + df_consolidated["PR Opened"] * pr_o_weight
-        + df_consolidated["PR Merged"] * pr_m_weight
-        + df_consolidated["PR Closed"] * pr_c_weight
+    # groups others together for final counts
+    df = (
+        df.groupby(by="company_name")["contribution_count"]
+        .sum()
+        .reset_index()
+        .sort_values(by=["contribution_count"])
+        .reset_index(drop=True)
     )
 
-    # column for log value of pr and issue actions
-    df_consolidated["log_prs_issues_actions_weighted"] = df_consolidated["prs_issues_actions_weighted"].apply(math.log)
-
-    return df_consolidated
+    return df
 
 
-def create_figure(df: pd.DataFrame, log):
+def fuzzy_match(df, name):
+    """
+    This function compares each row to all of the other values in the company_name column and
+    outputs a list on if there is a fuzzy match between the different rows. This gives the values
+    necessary for the loop to change the company name if there is a match. 70 is the match value
+    threshold for the partial ratio to be considered a match
+    """
+    matches = df.apply(lambda row: (fuzz.partial_ratio(row["company_name"], name) >= 70), axis=1)
+    return [i for i, x in enumerate(matches) if x]
 
-    y_axis = "prs_issues_actions_weighted"
-    y_title = "Weighted PR/Issue Actions"
-    if log:
-        y_axis = "log_prs_issues_actions_weighted"
-        y_title = "Log of Weighted PR/Issue Actions"
 
+def create_figure(df: pd.DataFrame):
     # graph generation
-    fig = px.scatter(
+    fig = px.pie(
         df,
-        x="log_num_commits",
-        y=y_axis,
-        color="repo_name",
-        size="log_num_contrib",
-        hover_data=["repo_name", "Commit", "PR Opened", "Issue Opened", "num_unique_contributors"],
+        names="company_name",
+        values="contribution_count",
         color_discrete_sequence=color_seq,
     )
-
     fig.update_traces(
-        hovertemplate="Repo: %{customdata[0]} <br>Commits: %{customdata[1]} <br>Total PRs: %{customdata[2]}"
-        + "<br>Total Issues: %{customdata[3]} <br>Total Contributors: %{customdata[4]}<br><extra></extra>",
-    )
-
-    # layout styling
-    fig.update_layout(
-        xaxis_title="Logarithmic Commits",
-        yaxis_title=y_title,
-        margin_b=40,
-        font=dict(size=14),
-        legend_title="Repo Name",
+        textposition="inside",
+        textinfo="percent+label",
+        hovertemplate="%{label} <br>Contributions: %{value}<br><extra></extra>",
     )
 
     return fig
