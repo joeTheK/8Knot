@@ -26,7 +26,7 @@ gc_org_div = dbc.Card(
         dbc.CardBody(
             [
                 html.H3(
-                    "org_div",
+                    "Organizational Diversity",
                     className="card-title",
                     style={"textAlign": "center"},
                 ),
